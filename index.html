@@ -135,10 +135,15 @@ aside.info.tutup{margin-right:-300px}
 .kosong .big{font-size:36px;margin-bottom:10px}
 
 /* ====== FAB & PANEL MENGAMBANG ====== */
-.fabs{position:fixed;right:14px;bottom:76px;display:flex;flex-direction:column;gap:10px;z-index:900}
+.fabs{position:fixed;right:14px;bottom:76px;display:flex;flex-direction:column;gap:10px;z-index:900;align-items:center}
 .fab{width:52px;height:52px;border-radius:50%;border:none;color:#fff;font-size:20px;box-shadow:0 5px 16px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;position:relative}
 .fab.hijau{background:var(--hijau)} .fab.tua{background:var(--hijau-tua)} .fab.biru{background:var(--biru)}
 .fab .badge-dot{top:-2px;right:-2px}
+.fab-action{opacity:0;transform:translateY(16px) scale(.4);pointer-events:none;transition:opacity .18s ease, transform .18s ease}
+.fabs.buka .fab-action{opacity:1;transform:none;pointer-events:auto}
+.fab-main{background:var(--hijau);transition:transform .22s ease}
+.fabs.buka .fab-main{transform:rotate(45deg)}
+.fab-main .badge-dot{background:var(--merah);width:13px;height:13px;min-width:0;padding:0}
 
 .panel{position:fixed;right:14px;bottom:76px;width:min(360px,calc(100vw - 28px));max-height:min(540px,72dvh);background:#fff;border-radius:16px;box-shadow:0 12px 50px rgba(0,0,0,.3);z-index:950;display:none;flex-direction:column;overflow:hidden}
 .panel.buka{display:flex}
@@ -363,10 +368,11 @@ nav.bottom button.aktif{color:var(--hijau)}
   </nav>
 
   <!-- FABS -->
-  <div class="fabs">
-    <button class="fab biru" onclick="togglePanel('panelOnline')" title="Tim Online">👥<span class="badge-dot" id="onlineCount">0</span></button>
-    <button class="fab tua" onclick="togglePanel('panelChat')" title="Chat Tim">💬<span class="badge-dot" id="chatBadge" style="display:none">0</span></button>
-    <button class="fab hijau" id="fabField" onclick="bukaFieldBaru()" title="Data Lapangan">📍</button>
+  <div class="fabs" id="fabs">
+    <button class="fab biru fab-action" onclick="togglePanel('panelOnline');tutupFabs()" title="Tim Online">👥<span class="badge-dot" id="onlineCount" style="display:none">0</span></button>
+    <button class="fab tua fab-action" onclick="togglePanel('panelChat');tutupFabs()" title="Chat Tim">💬<span class="badge-dot" id="chatBadge" style="display:none">0</span></button>
+    <button class="fab hijau fab-action" id="fabField" onclick="bukaFieldBaru();tutupFabs()" title="Data Lapangan">📍</button>
+    <button class="fab fab-main" id="fabMain" onclick="toggleFabs()" title="Menu cepat">✚<span class="badge-dot" id="fabDot" style="display:none"></span></button>
   </div>
 
   <!-- PANEL CHAT -->
@@ -439,9 +445,20 @@ nav.bottom button.aktif{color:var(--hijau)}
       <div class="fgroup"><label>Kecamatan</label><input id="bKec"></div>
       <div class="fgroup"><label>Kabupaten</label><input id="bKab"></div>
       <div class="fgroup"><label>Status</label><select id="bStatus"><option>Draft</option><option>Terverifikasi</option><option>Ditolak</option></select></div>
+      <div class="fgroup"><label>PKKPR</label><input id="bPkkpr" list="dlPkkpr" placeholder="kosong / ketik / pilih"></div>
+      <div class="fgroup"><label>IUP</label><input id="bIup" list="dlIup" placeholder="kosong / ketik / pilih"></div>
+      <div class="fgroup"><label>HGU</label><input id="bHgu" list="dlHgu" placeholder="kosong / ketik / pilih"></div>
       <div class="fgroup"><label>Tutupan Lahan</label><select id="bTutupan"><option>Hutan</option><option>Sawit</option><option>Semak Belukar</option><option>Pemukiman</option><option>Lahan Terbuka</option><option>Lainnya</option></select></div>
+      <div class="fgroup"><label>Kemiringan</label><input id="bKemiringan" placeholder="mis. 5 - 8 %"></div>
+      <div class="fgroup"><label>Elevasi</label><input id="bElevasi" placeholder="mis. 320 - 450 mdpl"></div>
       <div class="fgroup"><label>Warna Layer</label><input id="bWarna" type="color" value="#e74c3c" style="height:44px;padding:4px"></div>
     </div>
+    <datalist id="dlPkkpr"><option>Disetujui</option><option>Ditolak</option><option>Belum Ada</option></datalist>
+    <datalist id="dlIup"><option>Tersedia</option><option>Belum Ada</option></datalist>
+    <datalist id="dlHgu"><option>Tersedia</option><option>Belum Ada</option></datalist>
+    <div class="fgroup"><label>Koordinat (titik tengah) <small>terisi otomatis dari geometri</small></label>
+      <div style="display:flex;gap:6px"><input id="bKoordinat" placeholder="lat, lng" style="flex:1"><button type="button" class="btn btn-outline btn-mini" onclick="hitungPusatBidang()">🎯 Hitung ulang</button></div></div>
+    <div class="fgroup"><label>Catatan</label><textarea id="bCatatan" rows="4" placeholder="Catatan penting untuk bidang ini (mis. status sengketa, keterangan tambahan, tindak lanjut)..."></textarea></div>
     <button class="btn btn-hijau" id="btnSimpanBidang" onclick="simpanBidang()">💾 Simpan Bidang</button>
   </div>
 </div>
@@ -789,9 +806,10 @@ function initMap(){
   map.on(L.Draw.Event.CREATED, e => {
     drawLayer.clearLayers(); drawLayer.addLayer(e.layer);
     const gj = e.layer.toGeoJSON().geometry;
+    resetFormBidang();
     window._geomBaru = JSON.stringify(gj);
-    const luas = hitungLuasHa(gj);
-    $('bLuas').value = luas;
+    $('bLuas').value = hitungLuasHa(gj);
+    $('bKoordinat').value = pusatBidang(gj);
     bukaModal('modalBidang');
     toast('Poligon selesai. Luas ± '+luas+' Ha. Lengkapi data bidang.');
   });
@@ -932,8 +950,12 @@ function tampilInfo(b, lyr){
       <tr><td>IUP</td><td><span class="chip ${chip(b.iup)}">${esc(b.iup||'-')}</span></td></tr>
       <tr><td>HGU</td><td><span class="chip ${chip(b.hgu)}">${esc(b.hgu||'-')}</span></td></tr>
       <tr><td>Tutupan</td><td>${esc(b.tutupan||'-')}</td></tr>
+      <tr><td>Kemiringan</td><td>${esc(b.kemiringan||'-')}</td></tr>
+      <tr><td>Elevasi</td><td>${esc(b.elevasi||'-')}</td></tr>
+      <tr><td>Koordinat</td><td>${esc(b.koordinat||pusatBidang(b.geojson||'')||'-')}</td></tr>
       <tr><td>Dibuat oleh</td><td>${esc(b.dibuat_oleh||'-')}</td></tr>
     </table>
+    ${b.catatan?`<div style="margin-top:10px;background:#fbf7e9;border:1px solid #f0e2b8;border-radius:9px;padding:9px 11px"><div style="font-size:11px;font-weight:800;color:#9a7b1e;letter-spacing:.4px;margin-bottom:3px">📝 CATATAN</div><div style="font-size:12.5px;white-space:pre-wrap">${esc(b.catatan)}</div></div>`:''}
     <div class="info-actions">
       <button class="btn btn-outline btn-mini" onclick="zoomKe('${b.id}')">🔍 Zoom</button>
       ${USER.rules.bidang_edit?`<button class="btn btn-outline btn-mini" onclick="editBidang('${b.id}')">✏️ Edit</button>`:''}
@@ -1100,23 +1122,52 @@ function cariBidang(q){
 
 /* ============ BIDANG CRUD ============ */
 function mulaiGambar(){ toast('Gambar poligon bidang di peta (ikon ⬠ kiri atas peta)'); new L.Draw.Polygon(map, drawControl.options.draw.polygon).enable(); }
+function pusatBidang(gjStr){
+  try{
+    const g = typeof gjStr==='string'?JSON.parse(gjStr):gjStr;
+    let ring = g.coordinates[0]; if(g.type==='MultiPolygon') ring=g.coordinates[0][0];
+    let sx=0,sy=0,n=0;
+    for(let i=0;i<ring.length;i++){
+      if(i===ring.length-1 && ring[i][0]===ring[0][0] && ring[i][1]===ring[0][1]) break;
+      sx+=ring[i][0]; sy+=ring[i][1]; n++;
+    }
+    if(!n) return '';
+    return (sy/n).toFixed(6)+', '+(sx/n).toFixed(6);
+  }catch(e){ return ''; }
+}
+function hitungPusatBidang(){
+  const k = pusatBidang(window._geomBaru||'');
+  if(k){ $('bKoordinat').value=k; } else toast('Geometri bidang belum ada');
+}
+function resetFormBidang(){
+  $('bId').value=''; window._geomBaru='';
+  ['bNomor','bPemilik','bDesa','bKec','bKab','bPkkpr','bIup','bHgu','bKemiringan','bElevasi','bKoordinat','bCatatan','bLuas'].forEach(id=>{ const el=$(id); if(el) el.value=''; });
+  $('bJenis').value='SHM'; $('bStatus').value='Draft'; $('bTutupan').value='Lainnya'; $('bWarna').value='#e74c3c';
+}
 function editBidang(id){
   const b = DATA.bidang.find(x=>x.id===id); if(!b) return;
   window._geomBaru = b.geojson;
   $('bId').value=b.id; $('bNomor').value=b.nomor||''; $('bJenis').value=b.jenis||'SHM';
   $('bPemilik').value=b.pemilik||''; $('bLuas').value=b.luas_ha||''; $('bDesa').value=b.desa||'';
   $('bKec').value=b.kecamatan||''; $('bKab').value=b.kabupaten||''; $('bStatus').value=b.status||'Draft';
-  $('bTutupan').value=b.tutupan||'Lainnya'; $('bWarna').value=b.warna||'#e74c3c';
+  $('bPkkpr').value=b.pkkpr||''; $('bIup').value=b.iup||''; $('bHgu').value=b.hgu||'';
+  $('bTutupan').value=b.tutupan||'Lainnya'; $('bKemiringan').value=b.kemiringan||''; $('bElevasi').value=b.elevasi||'';
+  $('bKoordinat').value=b.koordinat||pusatBidang(b.geojson||'')||'';
+  $('bCatatan').value=b.catatan||''; $('bWarna').value=b.warna||'#e74c3c';
   bukaModal('modalBidang');
 }
 async function simpanBidang(){
   const btn=$('btnSimpanBidang'); btn.innerHTML='<span class="spin"></span> Menyimpan...'; btn.disabled=true;
   try{
+    if(!$('bKoordinat').value && window._geomBaru) $('bKoordinat').value = pusatBidang(window._geomBaru);
     const d = {id:$('bId').value||undefined, nomor:$('bNomor').value, jenis:$('bJenis').value, pemilik:$('bPemilik').value,
       luas_ha:$('bLuas').value, desa:$('bDesa').value, kecamatan:$('bKec').value, kabupaten:$('bKab').value,
-      status:$('bStatus').value, tutupan:$('bTutupan').value, warna:$('bWarna').value, geojson:window._geomBaru||''};
+      status:$('bStatus').value, pkkpr:$('bPkkpr').value, iup:$('bIup').value, hgu:$('bHgu').value,
+      tutupan:$('bTutupan').value, kemiringan:$('bKemiringan').value, elevasi:$('bElevasi').value,
+      koordinat:$('bKoordinat').value, catatan:$('bCatatan').value,
+      warna:$('bWarna').value, geojson:window._geomBaru||''};
     const r = await gas('saveBidang', TOKEN, d);
-    if(r.ok){ tutupModal('modalBidang'); drawLayer.clearLayers(); $('bId').value=''; toast('Bidang tersimpan ✓'); await muatData(); }
+    if(r.ok){ tutupModal('modalBidang'); drawLayer.clearLayers(); resetFormBidang(); toast('Bidang tersimpan ✓'); await muatData(); }
     else toast(r.msg||'Gagal menyimpan');
   }catch(e){ toast(e.message); }
   finally{ btn.innerHTML='💾 Simpan Bidang'; btn.disabled=false; }
@@ -1214,6 +1265,7 @@ async function ambilChat(){
       const last = r.msgs[r.msgs.length-1];
       if(chatLast && last.created_at > chatLast && last.username !== USER.username && !panelBuka){
         const b=$('chatBadge'); b.style.display='flex'; b.textContent = Number(b.textContent||0)+1;
+        perbaruiFabDot();
       }
       chatLast = last.created_at;
     }
@@ -1239,8 +1291,9 @@ async function kirimHB(){
   }catch(e){}
 }
 function renderOnline(list){
-  $('onlineCount').textContent = list.length;
+  const oc=$('onlineCount'); oc.textContent = list.length; oc.style.display = list.length?'flex':'none';
   const so = $('statOnline'); if(so) so.textContent = list.length;
+  perbaruiFabDot();
   $('onlineBody').innerHTML = list.map(o=>`
     <div class="online-item">
       <div class="avatar">${(o.nama||'?')[0].toUpperCase()}</div>
@@ -1925,11 +1978,12 @@ function selesaiRekam(){
   if(!rekam || rekam.pts.length<3) return toast('Butuh minimal 3 titik untuk membentuk bidang');
   const ring = rekam.pts.map(p=>[p.lng,p.lat]); ring.push(ring[0]);
   const geom = {type:'Polygon', coordinates:[ring]};
-  window._geomBaru = JSON.stringify(geom);
   const luas = hitungLuasHa(geom);
   akhiriRekam();
   // buka form bidang terisi
-  $('bId').value=''; $('bLuas').value=luas; $('bNomor').value=''; $('bPemilik').value='';
+  resetFormBidang();
+  window._geomBaru = JSON.stringify(geom);
+  $('bLuas').value=luas; $('bKoordinat').value=pusatBidang(geom);
   bukaModal('modalBidang');
   toast('Perekaman selesai. Luas ± '+luas+' Ha. Lengkapi data bidang.');
 }
@@ -1937,6 +1991,13 @@ function selesaiRekam(){
 /* ============ UTIL UI ============ */
 function bukaModal(id){ $(id).classList.add('buka'); }
 function tutupModal(id){ $(id).classList.remove('buka'); }
+function toggleFabs(){ $('fabs').classList.toggle('buka'); }
+function tutupFabs(){ $('fabs').classList.remove('buka'); }
+function perbaruiFabDot(){
+  const chatOn = $('chatBadge') && $('chatBadge').style.display!=='none';
+  const onlineN = parseInt(($('onlineCount')||{}).textContent||'0')||0;
+  const dot=$('fabDot'); if(dot) dot.style.display = (chatOn||onlineN>0) ? 'block' : 'none';
+}
 function togglePanel(id){
   ['panelChat','panelOnline','panelNotif'].forEach(p=>{ if(p!==id) $(p).classList.remove('buka'); });
   $(id).classList.toggle('buka');
@@ -1944,6 +2005,7 @@ function togglePanel(id){
     const b=$('chatBadge'); b.style.display='none'; b.textContent='0';
     $('chatBody').scrollTop = $('chatBody').scrollHeight;
   }
+  perbaruiFabDot();
 }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtWaktu(iso){

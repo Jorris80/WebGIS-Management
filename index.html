@@ -672,7 +672,7 @@ let rekam = null; // state rekam lapangan
 /* ============ KONFIG HOSTING ============ */
 // Jika aplikasi di-hosting statis (GitHub Pages), isi GAS_URL dengan URL Web App /exec Anda.
 // Jika di-hosting langsung dari Apps Script, biarkan kosong (otomatis pakai google.script.run).
-const CONFIG = { GAS_URL: '' };
+const CONFIG = { GAS_URL: 'https://script.google.com/macros/s/AKfycbzhKUbRkc8eXdSunBJGabLG9zN1IlJnaoDK8XYFaOnQ9jAneNXOUQROsbhffPQ7VS2RWA/exec' };
 const DI_GAS = (typeof google !== 'undefined' && google.script && google.script.run);
 
 const gas = (fn, ...args) => {

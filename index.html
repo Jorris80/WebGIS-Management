@@ -190,6 +190,13 @@ nav.bottom button .ic{font-size:19px}
 nav.bottom button.aktif{color:var(--hijau)}
 
 .hide-desktop{display:none}
+.ai-hasil{background:#fff;border:1px solid #e5ebe7;border-radius:12px;padding:16px 18px;max-height:56vh;overflow:auto;font-size:13.5px;line-height:1.7;margin-bottom:12px}
+.ai-hasil h1{font-size:18px;margin:0 0 8px} .ai-hasil h2{font-size:15px;margin:16px 0 6px;color:var(--hijau-tua)} .ai-hasil h3{font-size:13.5px;margin:12px 0 4px}
+.ai-hasil ul{margin:4px 0 10px;padding-left:20px} .ai-hasil li{margin:2px 0}
+.ai-hasil p{margin:6px 0} .ai-hasil code{background:var(--bg);padding:1px 5px;border-radius:5px;font-size:12px}
+.ai-hasil blockquote{border-left:3px solid var(--hijau);margin:8px 0;padding:4px 12px;color:var(--teks2);background:#f6faf7}
+.ai-badge{display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.4px}
+.ai-badge.ai{background:#e8f0fd;color:var(--biru)} .ai-badge.lokal{background:#fbf3e0;color:#9a7b1e}
 
 /* popup data lapangan */
 .popup-field{min-width:170px}
@@ -285,8 +292,8 @@ nav.bottom button.aktif{color:var(--hijau)}
     <div class="brand"><div class="leaf">🌿</div><div>WEBGIS<small>MANAGEMENT</small></div></div>
     <nav class="tabs">
       <button class="aktif">Dashboard</button><button onclick="fokusPeta()">Peta</button>
-      <button onclick="toast('Modul Analisis: gunakan alat Ukur & Area di peta')">Analisis</button>
-      <button onclick="exportGeo()">Laporan</button><button onclick="exportGeo()">Download</button>
+      <button onclick="bukaAnalisis()">Analisis</button>
+      <button onclick="bukaLaporan()">Laporan</button><button onclick="bukaDownload()">Download</button>
       <button id="tabPengaturan" onclick="bukaUsers()">Pengaturan</button>
     </nav>
     <div class="top-right">
@@ -671,6 +678,35 @@ nav.bottom button.aktif{color:var(--hijau)}
 </div>
 
 <!-- ================= LIGHTBOX FOTO ================= -->
+<!-- ================= MODAL ANALISIS / LAPORAN AI ================= -->
+<div class="modal" id="modalAI">
+  <div class="modal-card" style="max-width:720px">
+    <h2 id="aiTitle">🤖 Analisis AI <button onclick="tutupModal('modalAI')">✕</button></h2>
+    <div id="aiIntro" style="font-size:13px;color:var(--teks2);margin-bottom:12px"></div>
+    <div id="aiActions" style="display:none;gap:8px;margin-bottom:12px" >
+      <button class="btn btn-outline btn-mini" onclick="salinAI()">📋 Salin</button>
+      <button class="btn btn-outline btn-mini" onclick="unduhAI()">⬇️ Unduh .md</button>
+      <button class="btn btn-outline btn-mini" onclick="cetakAI()">🖨️ Cetak / PDF</button>
+      <button class="btn btn-outline btn-mini" onclick="jalankanAI(window._aiMode)">🔄 Ulang</button>
+    </div>
+    <div id="aiHasil" class="ai-hasil" style="display:none"></div>
+    <button class="btn btn-hijau" id="aiRunBtn" onclick="jalankanAI(window._aiMode)">✨ Jalankan</button>
+  </div>
+</div>
+
+<!-- ================= MODAL DOWNLOAD ================= -->
+<div class="modal" id="modalDownload">
+  <div class="modal-card">
+    <h2>⬇️ Download Data <button onclick="tutupModal('modalDownload')">✕</button></h2>
+    <p style="font-size:13px;color:var(--teks2);margin-bottom:14px">Unduh seluruh data bidang sebagai berkas <b>GeoJSON</b> (EPSG:4326) berisi geometri dan atribut lengkap — bisa dibuka di QGIS, ArcGIS, atau diunggah kembali sebagai layer.</p>
+    <div style="background:var(--bg);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px">
+      <div style="display:flex;justify-content:space-between"><span>Jumlah bidang</span><b id="dlJumlah">0</b></div>
+      <div style="display:flex;justify-content:space-between;margin-top:4px"><span>Total luas</span><b id="dlLuas">0 Ha</b></div>
+    </div>
+    <button class="btn btn-hijau" onclick="exportGeo();tutupModal('modalDownload')">⬇️ Download Bidang (GeoJSON)</button>
+  </div>
+</div>
+
 <div id="lightbox" onclick="tutupFoto()">
   <button class="lb-close" onclick="event.stopPropagation();tutupFoto()">✕</button>
   <img id="lbImg" src="" onclick="toggleZoomFoto(event)" alt="foto">
@@ -1887,6 +1923,83 @@ async function uploadDok(){
 }
 function hapusDok(id,bidangId){ if(!confirm('Hapus dokumen ini?'))return;
   gas('deleteDokumen',TOKEN,id).then(()=>{toast('Dokumen dihapus');muatDokumen(bidangId);}).catch(e=>toast(e.message||'Gagal')); }
+
+/* ============ ANALISIS / LAPORAN AI ============ */
+function mdRingan(t){
+  let h = esc(t);
+  h = h.replace(/^### (.*)$/gm,'<h3>$1</h3>')
+       .replace(/^## (.*)$/gm,'<h2>$1</h2>')
+       .replace(/^# (.*)$/gm,'<h1>$1</h1>')
+       .replace(/^&gt; (.*)$/gm,'<blockquote>$1</blockquote>')
+       .replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')
+       .replace(/`(.+?)`/g,'<code>$1</code>');
+  h = h.replace(/(?:^|\n)((?:- .*(?:\n|$))+)/g, (m,blok)=>{
+    const li = blok.trim().split('\n').map(x=>'<li>'+x.replace(/^- /,'')+'</li>').join('');
+    return '\n<ul>'+li+'</ul>';
+  });
+  h = h.split('\n').map(ln=>{
+    const s=ln.trim();
+    if(!s) return '';
+    if(/^<(h1|h2|h3|ul|li|blockquote|\/)/.test(s)) return ln;
+    return '<p>'+ln+'</p>';
+  }).join('\n');
+  return h;
+}
+function bukaAnalisis(){ siapkanAI('analisis'); }
+function bukaLaporan(){ siapkanAI('laporan'); }
+function siapkanAI(mode){
+  window._aiMode = mode; window._aiTeks = '';
+  $('aiTitle').innerHTML = (mode==='laporan'?'📄 Laporan AI':'🤖 Analisis AI')+' <button onclick="tutupModal(\'modalAI\')">✕</button>';
+  $('aiIntro').innerHTML = mode==='laporan'
+    ? 'Menyusun laporan naratif profesional dari seluruh data bidang, perizinan, dan lapangan di aplikasi ini.'
+    : 'Menghasilkan analisis ringkas: pola sebaran, komposisi, progres perizinan, dan rekomendasi tindak lanjut.';
+  $('aiHasil').style.display='none'; $('aiHasil').innerHTML='';
+  $('aiActions').style.display='none';
+  $('aiRunBtn').style.display='block';
+  $('aiRunBtn').innerHTML = '✨ '+(mode==='laporan'?'Buat Laporan':'Jalankan Analisis');
+  bukaModal('modalAI');
+}
+async function jalankanAI(mode){
+  const btn=$('aiRunBtn'); btn.style.display='block';
+  btn.innerHTML='<span class="spin"></span> Memproses data & AI...'; btn.disabled=true;
+  $('aiHasil').style.display='none'; $('aiActions').style.display='none';
+  try{
+    const r = await gas('analisisAI', TOKEN, mode);
+    if(!r.ok) throw new Error(r.msg||'Gagal');
+    window._aiTeks = r.teks||'';
+    const badge = r.sumber==='ai'
+      ? '<span class="ai-badge ai">✨ AI'+(r.model?(' · '+esc(r.model)):'')+'</span>'
+      : '<span class="ai-badge lokal">📊 Statistik lokal</span>';
+    $('aiHasil').innerHTML = '<div style="margin-bottom:8px">'+badge+'</div>'+mdRingan(r.teks||'');
+    $('aiHasil').style.display='block';
+    $('aiActions').style.display='flex';
+    btn.style.display='none';
+  }catch(e){ toast('Gagal: '+(e.message||e),4000); }
+  finally{ btn.disabled=false; btn.innerHTML='✨ '+(mode==='laporan'?'Buat Laporan':'Jalankan Analisis'); }
+}
+function salinAI(){ navigator.clipboard.writeText(window._aiTeks||'').then(()=>toast('Teks disalin ✓')).catch(()=>toast('Tidak bisa menyalin')); }
+function unduhAI(){
+  const nama = (window._aiMode==='laporan'?'Laporan':'Analisis')+'_WebGIS_'+new Date().toISOString().slice(0,10)+'.md';
+  const blob = new Blob([window._aiTeks||''], {type:'text/markdown'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=nama; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+function cetakAI(){
+  const w=window.open('','_blank');
+  w.document.write('<html><head><title>'+(window._aiMode==='laporan'?'Laporan':'Analisis')+' WebGIS</title>'+
+    '<style>body{font-family:system-ui,Arial;max-width:800px;margin:32px auto;padding:0 20px;line-height:1.7;color:#1a2b22}h1{font-size:22px}h2{font-size:17px;color:#0b2818;border-bottom:1px solid #e5ebe7;padding-bottom:4px}ul{padding-left:22px}blockquote{border-left:3px solid #16a34a;padding:4px 12px;color:#555;background:#f6faf7}</style></head><body>'+
+    mdRingan(window._aiTeks||'')+'</body></html>');
+  w.document.close(); setTimeout(()=>{ w.print(); }, 400);
+}
+
+/* ============ DOWNLOAD ============ */
+function bukaDownload(){
+  const b=DATA.bidang||[];
+  $('dlJumlah').textContent = b.length;
+  let luas=0; b.forEach(x=>luas+=parseFloat(x.luas_ha)||0);
+  $('dlLuas').textContent = (Math.round(luas*100)/100)+' Ha';
+  bukaModal('modalDownload');
+}
 
 /* ============ REKAM BIDANG DI LAPANGAN (pola GeoUkur) ============ */
 function pilihModeBidang(){ bukaModal('modalModeBidang'); }

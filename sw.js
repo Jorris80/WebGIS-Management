@@ -1,5 +1,5 @@
 /* WebGIS Management — Service Worker (PWA GitHub Pages) */
-const CACHE = 'webgis-v3';
+const CACHE = 'webgis-v1';
 const SHELL = [
   './',
   './index.html',
